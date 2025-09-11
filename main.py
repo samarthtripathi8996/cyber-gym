@@ -25,17 +25,17 @@ TEST_MODE = True
 # Configuration - Update these with your VM details when TEST_MODE = False
 VM_CONFIG = {
     "vm1": {
-        "host": "10.216.206.100",  # Replace with VM1 IP
+        "host": "",  # Replace with VM1 IP
         "port": 22,
-        "username": "server",  # Replace with your username
-        "password": "abcd",  # Replace with your password or use key
+        "username": "",  # Replace with your username
+        "password": "",  # Replace with your password or use key
         "name": "VM1"
     },
     "vm2": {
-       "host": "10.216.206.59",  # Replace with VM1 IP
+       "host": "",  # Replace with VM1 IP
         "port": 22,
-        "username": "aka",  # Replace with your username
-        "password": "rwinrur",  # Replace with your password or use key
+        "username": "",  # Replace with your username
+        "password": "",  # Replace with your password or use key
         "name": "VM2"
     }
 }
@@ -203,7 +203,7 @@ async def stats_websocket(websocket: WebSocket, vm_id: str):
 @app.get("/")
 async def get_index():
     return FileResponse('static/index.html')
-genai.configure(api_key="AIzaSyAQwKFzXSYK6mNI9YnvswJ30FW1yypwItg")
+genai.configure(api_key="")
 model = genai.GenerativeModel("gemini-1.5-flash")
 @app.get("/security-check")
 def security_check():
