@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber gym</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+}
+
+button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+        body {
+            background: #000000;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(20, 20, 40, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(40, 20, 40, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(20, 40, 20, 0.15) 0%, transparent 50%);
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(15, 15, 25, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .terminal-glass {
+            background: rgba(8, 8, 12, 0.9);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-card {
+            background: rgba(20, 20, 30, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(25, 25, 35, 0.7);
+        }
+
+        .terminal-container {
+            background: #0a0a0a !important;
+        }
+
+        .xterm-viewport {
+            background: #0a0a0a !important;
+        }
+
+        /* Custom Ubuntu terminal theme - authentic colors */
+        .xterm-screen {
+            background: #0a0a0a;
+        }
+
+        .header-glow {
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 40, 0.9));
+            backdrop-filter: blur(25px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-online {
+            color: #00ff88;
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+        }
+
+        .status-offline {
+            color: #ff4444;
+            text-shadow: 0 0 8px rgba(255, 68, 68, 0.3);
+        }
+
+        .brand-accent {
+            background: linear-gradient(45deg, #00ff88, #0088ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .pulse-dot {
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="header-glow sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+                            <span class="text-black font-bold text-sm">SG</span>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold brand-accent">CyberGym</h1>
+                            <p class="text-xs text-gray-400 font-mono">Training and learning platform</p>
+                        </div>
+                    </div>
+                    <div class="hidden md:flex items-center gap-4 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></div>
+                            <span>Systems Online</span>
+                        </div>
+                        <div class="w-px h-4 bg-gray-600"></div>
+                        <span id="uptime" class="font-mono">Uptime: --:--:--</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-xs text-gray-500 font-mono" id="timestamp"></div>
+                    <div class="hidden sm:block px-3 py-1 rounded-full bg-gray-800/50 text-xs text-gray-400 border border-gray-700">
+                        v2.1.0
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        <!-- VM1 Section -->
+        <section class="space-y-4">
+            <div class="glass-panel rounded-2xl overflow-hidden">
+                <!-- VM Header -->
+                <div class="px-6 py-4 border-b border-gray-800/50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <h2 class="text-lg font-semibold text-white"></h2>
+                            <div class="flex items-center gap-2 text-sm">
+                                <div id="vm1-status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                                <span id="vm1-status-text" class="text-gray-400">Initializing...</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-500 font-mono"></span>
+                            <span class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Row -->
+                <div class="px-6 py-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">CPU</div>
+                            <div id="vm1-cpu" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Memory</div>
+                            <div id="vm1-memory" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Storage</div>
+                            <div id="vm1-disk" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Load Avg</div>
+                            <div id="vm1-load" class="text-2xl font-mono font-medium text-white">0.00</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VM1 Terminal -->
+            <div class="terminal-glass rounded-2xl overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800/30">
+                    <div class="flex items-center gap-3">
+                        <div class="flex gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        </div>
+                        <span class="text-sm text-gray-400 font-mono"></span>
+                    </div>
+                    <div class="text-xs text-gray-500 font-mono">SSH Session Active</div>
+                </div>
+                <div class="terminal-container h-96" id="vm1-terminal"></div>
+            </div>
+        </section>
+    <button onclick="runSecurityCheck()">Run Security Check</button>
+<div id="report"></div>
+
+
+        <!-- VM2 Section -->
+        <section class="space-y-4">
+            <div class="glass-panel rounded-2xl overflow-hidden">
+                <!-- VM Headerfo -->
+                <div class="px-6 py-4 border-b border-gray-800/50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <h2 class="text-lg font-semibold text-white"></h2>
+                            <div class="flex items-center gap-2 text-sm">
+                                <div id="vm2-status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                                <span id="vm2-status-text" class="text-gray-400">Initializing...</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-500 font-mono"></span>
+                            <span class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Row -->
+                <div class="px-6 py-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">CPU</div>
+                            <div id="vm2-cpu" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Memory</div>
+                            <div id="vm2-memory" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Storage</div>
+                            <div id="vm2-disk" class="text-2xl font-mono font-medium text-white">0%</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="metric-card rounded-xl p-4">
+                            <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Load Avg</div>
+                            <div id="vm2-load" class="text-2xl font-mono font-medium text-white">0.00</div>
+                            <div class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VM2 Terminal -->
+            <div class="terminal-glass rounded-2xl overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800/30">
+                    <div class="flex items-center gap-3">
+                        <div class="flex gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        </div>
+                        <span class="text-sm text-gray-400 font-mono"></span>
+                    </div>
+                    <div class="text-xs text-gray-500 font-mono">SSH Session Active</div>
+                </div>
+                <div class="terminal-container h-96" id="vm2-terminal"></div>
+            </div>
+            
+        </section>
+    </main>
+
+    <script>
+        // Time and uptime updates
+        let startTime = Date.now();
+        
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('timestamp').textContent = 
+                now.toLocaleString('en-US', {
+                    timeZone: 'UTC',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }) + ' UTC';
+                
+            const uptime = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = uptime % 60;
+            document.getElementById('uptime').textContent = 
+                `Uptime: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        class VMMonitor {
+            constructor(vmId) {
+                this.vmId = vmId;
+                this.terminal = null;
+                this.terminalWs = null;
+                this.statsWs = null;
+                this.init();
+            }
+            
+            init() {
+                this.setupTerminal();
+                this.connectTerminal();
+                this.connectStats();
+            }
+            
+            setupTerminal() {
+                // Authentic Ubuntu terminal colors
+                this.terminal = new Terminal({
+                    cursorBlink: true,
+                    theme: {
+                        background: '#0a0a0a',
+                        foreground: '#ffffff',
+                        cursor: '#ffffff',
+                        black: '#2e3436',
+                        red: '#cc0000',
+                        green: '#4e9a06',
+                        yellow: '#c4a000',
+                        blue: '#3465a4',
+                        magenta: '#75507b',
+                        cyan: '#06989a',
+                        white: '#d3d7cf',
+                        brightBlack: '#555753',
+                        brightRed: '#ef2929',
+                        brightGreen: '#8ae234',
+                        brightYellow: '#fce94f',
+                        brightBlue: '#729fcf',
+                        brightMagenta: '#ad7fa8',
+                        brightCyan: '#34e2e2',
+                        brightWhite: '#eeeeec'
+                    },
+                    fontSize: 14,
+                    fontFamily: 'JetBrains Mono, Ubuntu Mono, Consolas, monospace',
+                    lineHeight: 1.2,
+                    letterSpacing: 0,
+                    scrollback: 5000,
+                    allowTransparency: true,
+                    minimumContrastRatio: 1
+                });
+                
+                this.terminal.open(document.getElementById(`${this.vmId}-terminal`));
+                this.fitTerminal();
+                
+                this.terminal.onData(data => {
+                    if (this.terminalWs && this.terminalWs.readyState === WebSocket.OPEN) {
+                        this.terminalWs.send(JSON.stringify({
+                            type: 'terminal_input',
+                            data: data
+                        }));
+                    }
+                });
+            }
+            
+            fitTerminal() {
+                const container = this.terminal.element.parentElement;
+                if (container) {
+                    const containerWidth = container.clientWidth - 20;
+                    const containerHeight = container.clientHeight - 20;
+                    
+                    const cols = Math.floor(containerWidth / 9);
+                    const rows = Math.floor(containerHeight / 17);
+                    
+                    this.terminal.resize(Math.max(cols, 80), Math.max(rows, 24));
+                }
+            }
+            
+            connectTerminal() {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/ws/terminal/${this.vmId}`;
+                
+                this.terminalWs = new WebSocket(wsUrl);
+                
+                this.terminalWs.onopen = () => {
+                    this.updateStatus('connected');
+                    this.terminal.write('\x1b[2J\x1b[H');
+                    this.terminal.write(`\x1b[32mConnected to ${this.vmId} terminal session\x1b[0m\r\n`);
+                    this.terminal.write(`\x1b[90m${new Date().toISOString()} - Terminal Nexus v2.1.0\x1b[0m\r\n\r\n`);
+                };
+                
+                this.terminalWs.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'terminal_output') {
+                        this.terminal.write(message.data);
+                    } else if (message.type === 'error') {
+                        this.terminal.write(`\r\n\x1b[31mConnection error: ${message.message}\x1b[0m\r\n`);
+                    }
+                };
+                
+                this.terminalWs.onclose = () => {
+                    this.updateStatus('disconnected');
+                    this.terminal.write(`\r\n\x1b[33mConnection lost. Reconnecting...\x1b[0m\r\n`);
+                    setTimeout(() => this.connectTerminal(), 3000);
+                };
+                
+                this.terminalWs.onerror = () => {
+                    this.updateStatus('error');
+                };
+            }
+            
+            connectStats() {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/ws/stats/${this.vmId}`;
+                
+                this.statsWs = new WebSocket(wsUrl);
+                
+                this.statsWs.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'stats') {
+                        this.updateStats(message.data);
+                    }
+                };
+                
+                this.statsWs.onclose = () => {
+                    setTimeout(() => this.connectStats(), 5000);
+                };
+            }
+            
+            updateStatus(status) {
+                const dot = document.getElementById(`${this.vmId}-status-dot`);
+                const text = document.getElementById(`${this.vmId}-status-text`);
+                
+                switch(status) {
+                    case 'connected':
+                        dot.className = 'w-2 h-2 rounded-full bg-green-400 pulse-dot';
+                        text.textContent = 'Online';
+                        text.className = 'status-online text-sm';
+                        break;
+                    case 'disconnected':
+                        dot.className = 'w-2 h-2 rounded-full bg-yellow-500 pulse-dot';
+                        text.textContent = 'Reconnecting';
+                        text.className = 'text-yellow-400 text-sm';
+                        break;
+                    case 'error':
+                        dot.className = 'w-2 h-2 rounded-full bg-red-500 pulse-dot';
+                        text.textContent = 'Error';
+                        text.className = 'status-offline text-sm';
+                        break;
+                }
+            }
+            
+            updateStats(stats) {
+                this.updateMetric(`${this.vmId}-cpu`, stats.cpu, '%');
+                this.updateMetric(`${this.vmId}-memory`, stats.memory, '%');
+                this.updateMetric(`${this.vmId}-disk`, stats.disk, '%');
+                this.updateMetric(`${this.vmId}-load`, stats.load, '', 2);
+            }
+            
+            updateMetric(elementId, value, suffix, decimals = 0) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    const displayValue = typeof value === 'number' 
+                        ? value.toFixed(decimals) + suffix
+                        : value + suffix;
+                    element.textContent = displayValue;
+                }
+            }
+        }
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const vm1Monitor = new VMMonitor('vm1');
+            const vm2Monitor = new VMMonitor('vm2');
+            
+            // Handle terminal resizing
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    vm1Monitor.fitTerminal();
+                    vm2Monitor.fitTerminal();
+                }, 200);
+            });
+        });
+        async function runSecurityCheck() {
+  // Show loading state
+  document.getElementById("report").innerHTML = "<em>Running security check...</em>";
+  
+  try {
+    let res = await fetch("/security-check");
+    let data = await res.json();
+
+    // Build report
+    let html = `
+      <h2>Attack Detected</h2>
+      <p>${data.attack_detected}</p>
+      <h2>Evidence</h2>
+      <ul>${data.evidence.map(e => `<li>${e}</li>`).join("")}</ul>
+      <h2>Recommendations</h2>
+      <ul>${data.recommendations.map(r => `<li>${r}</li>`).join("")}</ul>
+      <h2>Metrics</h2>
+      <canvas id="metricsChart" width="400" height="200"></canvas>
+    `;
+    document.getElementById("report").innerHTML = html;
+
+    // Draw chart
+    const ctx = document.getElementById('metricsChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ["Failed SSH Logins", "Root Logins", "Unusual Processes"],
+        datasets: [{
+          label: 'Suspicious Events',
+          data: [
+            data.metrics.failed_ssh_logins,
+            data.metrics.root_logins,
+            data.metrics.unusual_processes
+          ],
+          backgroundColor: ['#e74c3c', '#f39c12', '#3498db']
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+  } catch (err) {
+    document.getElementById("report").innerHTML = "<p style='color:red'>Error running security check</p>";
+    console.error(err);
+  }
+}
+    </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background: #1a1a1a;
+    color: #fff;
+    overflow-x: hidden;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 20px;
+    height: 100vh;
+}
+
+.vm-panel {
+    display: flex;
+    flex-direction: column;
+    background: #2d2d2d;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #444;
+}
+
+.vm-header {
+    background: #333;
+    padding: 15px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.stats-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 15px;
+    background: #252525;
+}
+
+.stat-box {
+    text-align: center;
+    padding: 10px;
+    background: #333;
+    border-radius: 5px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.terminal-container {
+    flex: 1;
+    padding: 10px;
+    background: #000;
+}
+
+.status {
+    padding: 10px;
+    text-align: center;
+    background: #444;
+    color: #fff;
+}
+
+.connected { 
+    background: #2d5a2d; 
+}
+
+.disconnected { 
+    background: #5a2d2d; 
+}
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 10px;
+    }
+    
+    .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
