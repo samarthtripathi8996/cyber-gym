@@ -2,18 +2,19 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import asyncio
-import json,tempfile
+import json, tempfile
 import psutil
 import logging
 import random
 import subprocess
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 import threading
 import time
 import google.generativeai as genai
 from fastapi.responses import HTMLResponse, JSONResponse
 import subprocess, json
+from pydantic import BaseModel  # add schema for runtime VM configuration
 app = FastAPI()
 
 # Mount static files
@@ -22,20 +23,19 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Test mode - set to True to simulate VMs locally
 TEST_MODE = True
 
-# Configuration - Update these with your VM details when TEST_MODE = False
 VM_CONFIG = {
     "vm1": {
-        "host": "",  # Replace with VM1 IP
+        "host": "", 
         "port": 22,
-        "username": "",  # Replace with your username
-        "password": "",  # Replace with your password or use key
+        "username": "",  
+        "password": "", 
         "name": "VM1"
     },
     "vm2": {
-       "host": "",  # Replace with VM1 IP
+        "host": "",  
         "port": 22,
-        "username": "",  # Replace with your username
-        "password": "",  # Replace with your password or use key
+        "username": "", 
+        "password": "",  
         "name": "VM2"
     }
 }
@@ -203,58 +203,147 @@ async def stats_websocket(websocket: WebSocket, vm_id: str):
 @app.get("/")
 async def get_index():
     return FileResponse('static/index.html')
-genai.configure(api_key="")
-model = genai.GenerativeModel("gemini-1.5-flash")
+
+genai_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if genai_api_key:
+    genai.configure(api_key=genai_api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+else:
+    model = None
+
 @app.get("/security-check")
-def security_check():
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def security_check(vm_id: str = "vm1"):
+    if not PARAMIKO_AVAILABLE:
+        return JSONResponse({"error": "SSH library not available on server"}, status_code=500)
 
-    config = VM_CONFIG["vm1"]  # Change to "vm2" to analyze VM2
-    ssh.connect(
-        hostname=config["host"],
-        port=config["port"],
-        username=config["username"],
-        password=config["password"]
-        )
-        
+    if vm_id not in VM_CONFIG:
+        return JSONResponse({"error": f"Unknown vm_id '{vm_id}'"}, status_code=400)
 
-    # Run log collection script on victim
-    ssh.exec_command("bash ~/ai/collect_logs_ai.sh")
+    if not model:
+        return JSONResponse({"error": "Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY."}, status_code=500)
 
-    # Fetch JSON file back to backend
-    sftp = ssh.open_sftp()
-    local_tmp = tempfile.NamedTemporaryFile(delete=False)
-    sftp.get("/home/server/system_logs/system_logs_ai.json", local_tmp.name)
-    sftp.close()
-    ssh.close()
-
-    # Load logs
-    with open(local_tmp.name) as f:
-        logs = json.load(f)
-
-    # Ask Gemini for a structured report
-    prompt = """
-    You are a cybersecurity analyst. Analyze the system logs.
-    Respond ONLY in valid JSON with the following structure:
-    {
-      "attack_detected": "short summary of the attack",
-      "evidence": ["list of evidence points"],
-      "recommendations": ["list of security fixes"]
-    }
-    """
-
-    response = model.generate_content([prompt, json.dumps(logs)])
-
-    # Try to parse as JSON
     try:
-        report = json.loads(response.text)
-    except:
-        report = {"attack_detected": "Parsing error",
-                  "evidence": [response.text],
-                  "recommendations": []}
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        config = VM_CONFIG[vm_id]
 
-    return JSONResponse(report)
+        if not all([config.get("host"), config.get("username")]):
+            return JSONResponse({"error": "VM host/username not configured on server"}, status_code=400)
+
+        ssh.connect(
+            hostname=config["host"],
+            port=config.get("port", 22),
+            username=config["username"],
+            password=config.get("password")
+        )
+
+        # Determine remote $HOME
+        _, stdout, _ = ssh.exec_command("bash -lc 'echo -n $HOME'")
+        remote_home = stdout.read().decode().strip() or "/home"
+        remote_json_path = f"{remote_home}/system_logs/system_logs_ai.json"
+
+        # Try to run existing script first
+        try:
+            stdin, stdout, stderr = ssh.exec_command("bash -lc 'bash ~/ai/collect_logs_ai.sh'")
+            exit_status = stdout.channel.recv_exit_status()
+            if exit_status != 0:
+                raise RuntimeError("Remote script not found or failed")
+        except Exception:
+            # Fallback: upload local script and execute
+            try:
+                sftp = ssh.open_sftp()
+                remote_tmp = "/tmp/collect_logs_ai.sh"
+                with open("collect_logs_ai.sh", "rb") as f:
+                    sftp.putfo(f, remote_tmp)
+                sftp.chmod(remote_tmp, 0o755)
+                sftp.close()
+
+                stdin, stdout, stderr = ssh.exec_command(f"bash -lc '{remote_tmp}'")
+                _ = stdout.channel.recv_exit_status()
+            except Exception as e2:
+                ssh.close()
+                return JSONResponse({"error": f"Failed to run logs collector on remote: {e2}"}, status_code=500)
+
+        # Fetch the structured JSON back
+        sftp = ssh.open_sftp()
+        local_tmp = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            sftp.get(remote_json_path, local_tmp.name)
+        finally:
+            sftp.close()
+            ssh.close()
+
+        with open(local_tmp.name) as f:
+            logs = json.load(f)
+
+        # Extract basic metrics if available
+        metrics = logs.get("suspicious_events", {})
+
+        # Ask Gemini for a structured report
+        prompt = """
+        You are a cybersecurity analyst. Analyze the provided system logs and indicators.
+        Respond ONLY in valid JSON with the following structure:
+        {
+          "attack_detected": "short summary of the attack or 'No attack detected'",
+          "evidence": ["list of evidence points"],
+          "recommendations": ["list of security fixes and next steps"]
+        }
+        """
+        response = model.generate_content([prompt, json.dumps(logs)])
+
+        try:
+            report = json.loads(response.text)
+        except Exception:
+            report = {
+                "attack_detected": "Parsing error",
+                "evidence": [getattr(response, "text", "No text")],
+                "recommendations": []
+            }
+
+        report["metrics"] = {
+            "failed_ssh_logins": metrics.get("failed_ssh_logins", 0),
+            "root_logins": metrics.get("root_logins", 0),
+            "unusual_processes": metrics.get("unusual_processes_as_nobody", 0)
+        }
+
+        return JSONResponse(report)
+
+    except Exception as e:
+        return JSONResponse({"error": f"Unexpected error: {str(e)}"}, status_code=500)
+
+class VMConfigUpdate(BaseModel):  # schema for POST /configure-vm
+    vm_id: str
+    host: str
+    port: int = 22
+    username: str
+    password: Optional[str] = None
+
+@app.post("/configure-vm")  # allow manual VM IP/credentials and force reconnect
+def configure_vm(cfg: VMConfigUpdate):
+    if cfg.vm_id not in VM_CONFIG:
+        return JSONResponse({"error": "Unknown vm_id"}, status_code=400)
+    
+    VM_CONFIG[cfg.vm_id]["host"] = cfg.host
+    VM_CONFIG[cfg.vm_id]["port"] = cfg.port
+    VM_CONFIG[cfg.vm_id]["username"] = cfg.username
+    VM_CONFIG[cfg.vm_id]["password"] = cfg.password or ""
+    
+    # Close existing SSH session (if any) so next websocket connect will use new config
+    try:
+        ch = ssh_channels.pop(cfg.vm_id, None)
+        if ch:
+            ch.close()
+    except Exception:
+        pass
+    try:
+        cl = ssh_clients.pop(cfg.vm_id, None)
+        if cl:
+            cl.close()
+    except Exception:
+        pass
+    
+    return JSONResponse({"status": "updated", "vm_id": cfg.vm_id})
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
